@@ -24,6 +24,7 @@ You can start and stop cleaning and send the robot back to the home base with ``
 ``ResumeCleaning``, ``EndCleaning`` and ``ReturnHome``
 
 .. code:: python
+
     from pyirobot import Robot
     robot = Robot("192.168.0.0", "MtccDqXskShX|4jXnTd")
     robot.StartCleaning()
@@ -37,6 +38,7 @@ Robot Configuration
 are all enums in the module.
 
 .. code:: python
+
     import json
     from pyirobot import Robot
     robot = Robot("192.168.0.0", "MtccDqXskShX|4jXnTd")
