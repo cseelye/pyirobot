@@ -7,6 +7,8 @@ This ia a python module for controlling the iRobot Roomba 980 (and possibly Room
 iRobot does not povide an official API for their robots; I reverse engineered this from the communication between my robot, the
 iRobot iOS app, and the Axeda IoT cloud service.
 
+This module is published to `pypi`_, so you can install it via ``pip install pyirobot``
+
 Usage
 =====
 
@@ -63,3 +65,5 @@ Known Issues
 ============
 This module is still a work in progress, so error handling and unit tests are pretty light and the API isn't complete yet
 This first release only supports local communication with the robot; remote/cloud support is in progress
+
+.. _pypi: https://pypi.python.org/pypi/pyirobot
