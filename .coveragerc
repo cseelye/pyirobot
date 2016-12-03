@@ -1,0 +1,14 @@
+[run]
+branch = True
+cover_pylib = False
+source = .
+omit = 
+    setup.py
+    */test/*
+    /System/*
+    /Library/*
+    *.virtualenv*
+
+[report]
+show_missing = True
+
