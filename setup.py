@@ -15,7 +15,7 @@ setup(
     url = "https://github.com/cseelye/pyirobot",
     long_description = open(os.path.join(os.path.dirname(__file__), "README.rst")).read(),
     install_requires = [
-        "enum43",
-        "requests",
+        "enum34>=1.1.6",
+        "requests>=2.12.3",
     ]
 )
