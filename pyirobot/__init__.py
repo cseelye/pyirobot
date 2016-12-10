@@ -9,6 +9,8 @@ import datetime
 from enum import Enum
 import json
 import requests
+import socket
+import struct
 
 # Disable SSL warning from requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -58,6 +60,9 @@ class Robot(object):
 
         Before calling this method, place the robot on its dock and then hold down the home button for 3-4 seconds,
         until the LEDs illuminate and the robot emits a series of tones.  Then quickly call this method
+
+        Returns:
+            The robot password (str)
         """
         result = requests.post("https://{}/umi".format(robotIP),
                                 data=json.dumps({"do" : "get",
@@ -69,6 +74,26 @@ class Robot(object):
         if "err" in res:
             raise RobotError(res["err"])
         return res["ok"]["passwd"]
+
+    @staticmethod
+    def GetBLID(robotIP, password):
+        """
+        Get this robot's BLID, which you need for making cloud-based calls to the robot
+
+        Returns:
+            The robot BLID (str)
+        """
+        result = requests.post("https://{}/umi".format(robotIP),
+                                data=json.dumps({"do" : "get",
+                                                 "args" : ["sys"],
+                                                 "id" : 0}),
+                                auth=("user", password),
+                                headers={"Content-Type" : "application/json"},
+                                verify=False)
+        res = result.json()
+        if "err" in res:
+            raise RobotError(res["err"])
+        return "".join([i[2:] for i in map(hex, res["ok"]["blid"])])
 
     def __init__(self, robotIP, robotPassword):
         self.ip = robotIP
@@ -106,8 +131,8 @@ class Robot(object):
                                 auth=("user", self.password),
                                 headers={"Content-Type" : "application/json"},
                                 verify=False)
-        print result.request.body
-        print result.text
+#        print result.request.body
+#        print result.text
         res = result.json()
         if "err" in res:
             raise RobotError(res["err"])
@@ -151,7 +176,7 @@ class Robot(object):
         """
         self._PostToRobot("set", ["cmd", {"op" : "dock"}])
 
-    def GetPreferences(self):
+    def GetCleaningPreferences(self):
         """
         Get this robot's cleaning preferences
 
@@ -188,13 +213,73 @@ class Robot(object):
 
     def GetSchedule(self):
         """
-        Get the cleaning schedulefor this robot
+        Get the cleaning schedule for this robot
         
         Returns:
             A dictionary representing the schedule (dict)
         """
         result = self._PostToRobot("get", "week")
         return result
+
+    def GetMission(self):
+        """
+        Get the real-time status and position of the robot
+
+        Returns:
+            A dictionary with the current robot status (dict)
+        """
+        return self._PostToRobot("get", "mssn")
+
+    def GetWiFiDetails(self):
+        """
+        Get detailed information about the robot's WiFi connection
+
+        Returns:
+            A dictionary of wifi information (dict)
+        """
+        res = self._PostToRobot("get", "wlstat")
+
+        # Transform the data to be more user friendly and closer to how the app presents it
+        res["bssid"] = ":".join([i[2:] for i in map(hex, res["bssid"])])
+        res["dhcp"] = True if res["dhcp"] == 1 else False
+        res["ip_address"] = socket.inet_ntoa(struct.pack("I", res.pop("addr")))
+        res["subnet_mask"] = socket.inet_ntoa(struct.pack("I", res.pop("mask")))
+        res["router"] = socket.inet_ntoa(struct.pack("I", res.pop("gtwy")))
+        res["dns1"] = socket.inet_ntoa(struct.pack("I", res.pop("dns1")))
+        res["dns2"] = socket.inet_ntoa(struct.pack("I", res.pop("dns2")))
+        res["signal_strength"] = res.pop("strssi")
+        res["security_type"] = "WPA2" if res["sec"] == 4 else str(res["sec"])
+        res.pop("sec")
+
+        return res
+
+    def GetWiFiStatus(self):
+        """
+        Get a simple check of the robot's WiFi status
+
+        Returns:
+            A dictionary of status (dict)
+        """
+        res = self._PostToRobot("get", "wllaststat")
+
+        # Transform data to better match GetWiFiDetails
+        res["signal_strength"] = res.pop("strssi")
+        return res
+
+    def GetCloudConfig(self):
+        return self._PostToRobot("get", "cloudcfg")
+
+    def GetSKU(self):
+        return self._PostToRobot("get", "sku")
+
+    def GetSys(self):
+        return self._PostToRobot("get", "sys")
+
+    def GetBBRun(self):
+        return self._PostToRobot("get", "bbrun")
+
+    def GetWiFiSettings(self):
+        return self._PostToRobot("get", "wlconfig")
 
 
 

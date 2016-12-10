@@ -5,7 +5,8 @@ pyirobot
 This ia a python module for controlling the iRobot Roomba 980 (and possibly Roomba 960 and Braava 300, but those are untested)
 
 iRobot does not povide an official API for their robots; I reverse engineered this from the communication between my robot, the
-iRobot iOS app, and the Axeda IoT cloud service.
+iRobot iOS app, and the Axeda IoT cloud service.  The names of methods and attributes are mapped as closely as possible to the
+way the ap presents them.
 
 This module is published to `pypi`_, so you can install it via ``pip install pyirobot``
 
@@ -36,15 +37,16 @@ You can start and stop cleaning and send the robot back to the home base with ``
 
 Robot Configuration
 '''''''''''''''''''
-``GetPreferences`` returns the cleaning preferences for the robot.  CarpetBoost, CleaningPasses, EdgeClean and FinishWhenBinFull
-are all enums in the module.
+
+``GetCleaningPreferences`` returns the cleaning preferences for the robot.  CarpetBoost, CleaningPasses, EdgeClean and
+FinishWhenBinFull are all enums in the module.
 
 .. code:: python
 
     import json
     from pyirobot import Robot
     robot = Robot("192.168.0.0", "MtccDqXskShX|4jXnTd")
-    print json.dumps(robot.GetPreferences(), sort_keys=True, indent=4)
+    print json.dumps(robot.GetCleaningPreferences(), sort_keys=True, indent=4)
 
 Output::
 
@@ -60,6 +62,12 @@ Output::
 
 There are other functions for getting the cleaning schedule, robot time, and various other settings, as well as the corresponding
 Set functions.
+
+Errors
+''''''
+
+Any error coming back from the robot's API is thrown as a ``RobotError``.  Errors from networking/communication with the robot
+are thrown by ``requests`` and uncaught/unmodified by this library.
 
 Known Issues
 ============

@@ -8,7 +8,7 @@ from .util import RandomComplexString, RandomIP
 
 class Test_PreferenceFlags(object):
 
-    def test_DecodeFlags(self, monkeypatch):
+    def test_DecodeFlags(self):
         print
 
         from pyirobot import CarpetBoost, CleaningPasses, FinishWhenBinFull, EdgeClean, Robot
