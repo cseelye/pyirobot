@@ -12,32 +12,89 @@ import requests
 import socket
 import struct
 
-# Disable SSL warning from requests
+# Disable SSL warning from requests - the Roomba's SSL certificate is self signed
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
+# Monkey patch the json module to be able to encode Enums
+_json_default = json.JSONEncoder().default
+def _encode_enum(self, obj):
+    if isinstance(obj, Enum):
+        return obj.name
+    return _json_default(self, obj)
+json.JSONEncoder.default = _encode_enum
 
 class CarpetBoost(Enum):
+    Unknown = -1
     Auto = 0
     Eco = 16
     Perf = 80
-    __order__ = "Eco Perf Auto"
 
 class CleaningPasses(Enum):
+    Unknown = -1
     Auto = 0
     One = 1024
     Two = 1025
-    __order__ = "One Two Auto"
 
 class FinishWhenBinFull(Enum):
+    Unknown = -1
     On = 0
     Off = 32
-    __order__ = "Off On"
 
 class EdgeClean(Enum):
+    Unknown = -1
     On = 0
     Off = 2
-    __order__ = "Off On"
+
+class MissionState(Enum):
+    Unknown = -1
+    Normal = 4
+    BinFull = 1
+    Resuming = 8
+
+class RobotStatus(Enum):
+    Idle = "none"
+    Cleaning = "run"
+    Stopped = "stop"
+    Charging = "charge"
+    Resuming = "resume"
+    ReturningHome = "hmPostMsn"
+    Cancelling = "hmUsrDock"
+    Stuck = "stuck"
+
+# From http://homesupport.irobot.com/app/answers/detail/a_id/9024/~/roomba-900-error-messages
+_ErrorMessages = {
+    1 : "Roomba is stuck with its left or right wheel hanging down.",
+    2 : "The debris extractors can't turn.",
+    5 : "The left or right wheel is stuck.",
+    6 : "The cliff sensors are dirty, it is hanging over a drop, or it is stuck on a dark surface.",
+    8 : "The fan is stuck or its filter is clogged.",
+    9 : "The bumper is stuck, or the bumper sensor is dirty.",
+    10: "The left or right wheel is not moving.",
+    11: "Roomba has an internal error.",
+    14: "The bin has a bad connection to the robot.",
+    15: "Roomba has an internal error.",
+    16: "Roomba has started while moving or at an angle, or was bumped while running.",
+    17: "The cleaning job is incomplete.",
+    18: "Roomba cannot return to the Home Base or starting position."
+}
+
+_MissionCycleToCleaningPasses = {
+    "quick" : CleaningPasses.One,
+    "clean" : CleaningPasses.Two
+}
+
+def _EnumToCamelCase(obj):
+    """
+    Convert an Enum class to a camelCase name
+
+    Args:
+        obj:    the Enum to get a name for (Enum)
+
+    Returns:
+        A camelCase version of the Enum name (str)
+    """
+    return obj.__name__[0].lower() + obj.__name__[1:]
 
 class RobotError(Exception):
     """ Exception thrown when there is an error """
@@ -193,11 +250,14 @@ class Robot(object):
         # Decode the flags
         flags = result["flags"]
         for conf in (CarpetBoost, CleaningPasses, FinishWhenBinFull, EdgeClean):
+            pref_name = unicode(_EnumToCamelCase(conf))
             test = flags & max(conf, key=lambda x: x.value).value
-            for itr in conf:
-                if test == itr.value:
-                    prefs[conf.__name__[0].lower() + conf.__name__[1:]] = itr.name
-                    break
+            try:
+                item = conf(test)
+            except ValueError:
+                prefs[pref_name] = conf["Unknown"]
+                continue
+            prefs[pref_name] = item
         return prefs
 
     def GetTime(self):
@@ -228,7 +288,49 @@ class Robot(object):
         Returns:
             A dictionary with the current robot status (dict)
         """
-        return self._PostToRobot("get", "mssn")
+        res = self._PostToRobot("get", "mssn")
+
+        # Transform the data to be more user friendly and closer to how the app presents it
+        res[u"batteryPercentage"] = res.pop("batPct")
+        if res["expireM"] <= 0:
+            res.pop("expireM")
+        else:
+            res[u"minutesUntilMissionCancelled"] = res.pop("expireM")
+        res[u"missionElapsedMinutes"] = res.pop("mssnM")
+        res[u"readyToStart"] = True if res["notReady"] == 0 else False
+        res.pop("notReady")
+        res[u"robotPosition"] = res.pop("pos")
+        if res["rechrgM"] <= 0:
+            res.pop("rechrgM")
+        else:
+            res[u"rechargeMinutesRemaining"] = res.pop("rechrgM")
+        res[u"missionCoveredSquareFootage"] = res.pop("sqft")
+
+        res[u"binFull"] = False
+        if res["flags"] & MissionState.BinFull.value == MissionState.BinFull.value:
+            res[u"binFull"] = True
+
+        try:
+            res[u"robotStatus"] = RobotStatus(res["phase"])
+        except ValueError:
+            res[u"robotStatus"] = res["phase"]
+        if res["robotStatus"] == RobotStatus.Cleaning and res["flags"] * MissionState.Resuming.value == MissionState.Resuming.value:
+            res[u"robotStatus"] = RobotStatus.Resuming
+
+        res.pop("flags")
+        res.pop("phase")
+
+        if res["error"] == 0:
+            res.pop("error")
+        elif res["error"] in _ErrorMessages:
+            res[u"errorMessage"] = _ErrorMessages[res["error"]]
+
+        if res["cycle"] == "none":
+            res.pop("cycle")
+        elif res["cycle"] in _MissionCycleToCleaningPasses:
+            res["cycle"] = _MissionCycleToCleaningPasses[res["cycle"]]
+
+        return res
 
     def GetWiFiDetails(self):
         """
@@ -242,13 +344,13 @@ class Robot(object):
         # Transform the data to be more user friendly and closer to how the app presents it
         res["bssid"] = ":".join([i[2:] for i in map(hex, res["bssid"])])
         res["dhcp"] = True if res["dhcp"] == 1 else False
-        res["ip_address"] = socket.inet_ntoa(struct.pack("I", res.pop("addr")))
-        res["subnet_mask"] = socket.inet_ntoa(struct.pack("I", res.pop("mask")))
+        res["ipAddress"] = socket.inet_ntoa(struct.pack("I", res.pop("addr")))
+        res["subnetMask"] = socket.inet_ntoa(struct.pack("I", res.pop("mask")))
         res["router"] = socket.inet_ntoa(struct.pack("I", res.pop("gtwy")))
         res["dns1"] = socket.inet_ntoa(struct.pack("I", res.pop("dns1")))
         res["dns2"] = socket.inet_ntoa(struct.pack("I", res.pop("dns2")))
-        res["signal_strength"] = res.pop("strssi")
-        res["security_type"] = "WPA2" if res["sec"] == 4 else str(res["sec"])
+        res["signalStrength"] = res.pop("strssi")
+        res["securityType"] = "WPA2" if res["sec"] == 4 else str(res["sec"])
         res.pop("sec")
 
         return res
@@ -281,8 +383,11 @@ class Robot(object):
     def GetWiFiSettings(self):
         return self._PostToRobot("get", "wlconfig")
 
-
-
-
-
-
+    def GetStatus(self):
+        """
+        Get a combined view of preferences and mission in a single call
+        """
+        return {
+            "cleaningPreferences" : self.GetCleaningPreferences(),
+            "mission" : self.GetMission()
+        }
