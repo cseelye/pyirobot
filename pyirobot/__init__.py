@@ -286,7 +286,7 @@ class Robot(object):
         Get the time this robot is set to
 
         Returns:
-            The robot's time (datetime object)
+            A dictionary with the time of day and day of week (dict)
         """
         result = self._PostToRobot("get", "time")
         return {
@@ -297,9 +297,9 @@ class Robot(object):
     def GetSchedule(self):
         """
         Get the cleaning schedule for this robot
-        
+
         Returns:
-            A dictionary representing the schedule (dict)
+            A dictionary representing the schedule per day (dict)
         """
         res = self._PostToRobot("get", "week")
         schedule = {}
