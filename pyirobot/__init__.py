@@ -16,11 +16,13 @@ import struct
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-# Monkey patch the json module to be able to encode Enums
+# Monkey patch the json module to be able to encode Enums and datetime.time
 _json_default = json.JSONEncoder().default
 def _encode_enum(self, obj):
     if isinstance(obj, Enum):
         return obj.name
+    if isinstance(obj, datetime.time):
+        return str(obj)
     return _json_default(self, obj)
 json.JSONEncoder.default = _encode_enum
 
@@ -82,6 +84,25 @@ _ErrorMessages = {
 _MissionCycleToCleaningPasses = {
     "quick" : CleaningPasses.One,
     "clean" : CleaningPasses.Two
+}
+
+class Weekdays(Enum):
+    Sunday = 0
+    Monday = 1
+    Tuesday = 2
+    Wednesday = 3
+    Thursday = 4
+    Friday = 5
+    Saturday = 6
+
+_DayToWeekday = {
+    "sun" : Weekdays["Sunday"],
+    "mon" : Weekdays["Monday"],
+    "tue" : Weekdays["Tuesday"],
+    "wed" : Weekdays["Wednesday"],
+    "thu" : Weekdays["Thursday"],
+    "fri" : Weekdays["Friday"],
+    "sat" : Weekdays["Saturday"]
 }
 
 def _EnumToCamelCase(obj):
@@ -267,9 +288,11 @@ class Robot(object):
         Returns:
             The robot's time (datetime object)
         """
-        now = datetime.datetime.now()
         result = self._PostToRobot("get", "time")
-        return datetime.datetime(now.year, now.month, now.day, result["h"], result["m"])
+        return {
+            "time" : datetime.time(result["h"], result["m"]),
+            "weekday" : _DayToWeekday[result["d"]]
+        }
 
     def GetSchedule(self):
         """
@@ -278,8 +301,14 @@ class Robot(object):
         Returns:
             A dictionary representing the schedule (dict)
         """
-        result = self._PostToRobot("get", "week")
-        return result
+        res = self._PostToRobot("get", "week")
+        schedule = {}
+        for idx in xrange(7):
+            schedule[Weekdays(idx).name] = {
+                "clean" : True if res["cycle"][idx] == "start" else False,
+                "startTime" : datetime.time(res["h"][idx], res["m"][idx])
+            }
+        return schedule
 
     def GetMission(self):
         """
@@ -365,7 +394,7 @@ class Robot(object):
         res = self._PostToRobot("get", "wllaststat")
 
         # Transform data to better match GetWiFiDetails
-        res["signal_strength"] = res.pop("strssi")
+        res["signalStrength"] = res.pop("strssi")
         return res
 
     def GetCloudConfig(self):
