@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 """
 A python library for controlling an iRobot cleaning robot
-Only the Roomba 980 is tested; the Roomba 960 should work and possibly the Braava 300
+Only the Roomba 980 is tested; the Roomba 960 should work and possibly the Braava Jet
 """
 
 import collections

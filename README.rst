@@ -2,7 +2,7 @@
 pyirobot
 ========
 
-This ia a python module for controlling the iRobot Roomba 980 (and possibly Roomba 960 and Braava 300, but those are untested)
+This ia a python module for controlling the iRobot Roomba 980 (and possibly Roomba 960 and Braava Jet, but those are untested)
 
 iRobot does not povide an official API for their robots; I reverse engineered this from the communication between my robot, the
 iRobot iOS app, and the Axeda IoT cloud service.  The names of methods and attributes are mapped as closely as possible to the
