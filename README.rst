@@ -63,8 +63,36 @@ Output::
         "timezone": "America/Chicago"
     }
 
+``GetMission`` returns real time status about the robot, including battery and bin as well as the current cleaning status, if the robot is currently cleaning.
+
+.. code:: python
+
+    print robot.GetMission()
+
+    {u'binStatus': <BinStatus.Normal: (0,)>, u'readyStatus': <ReadyStatus.Ready: 0>, u'robotPosition': {u'theta': -79, u'point': {u'y': -22, u'x': 2}}, u'robotStatus': <RobotStatus.Charging: 'charge'>, u'missionCoveredSquareFootage': 0, u'missionElapsedMinutes': 0, u'batteryPercentage': 100}
+
+.. code:: python
+
+    print json.dumps(robot.GetMission(), sort_keys=True, indent=4)
+
+    {
+        "batteryPercentage": 100, 
+        "binStatus": "Normal", 
+        "missionCoveredSquareFootage": 0, 
+        "missionElapsedMinutes": 0, 
+        "readyStatus": "Ready", 
+        "robotPosition": {
+            "point": {
+                "x": 2, 
+                "y": -22
+            }, 
+            "theta": -79
+        }, 
+        "robotStatus": "Charging"
+    }
+
 There are other functions for getting the cleaning schedule, robot time, and various other settings, as well as the corresponding
-Set functions.
+Set functions, and enums for the various fields.
 
 .. code:: python
 
@@ -105,32 +133,6 @@ Set functions.
             "startTime": "10:00:00", 
             "clean": false
         }
-    }
-
-.. code:: python
-
-    print robot.GetMission()
-
-    {u'binStatus': <BinStatus.Normal: (0,)>, u'readyStatus': <ReadyStatus.Ready: 0>, u'robotPosition': {u'theta': -79, u'point': {u'y': -22, u'x': 2}}, u'robotStatus': <RobotStatus.Charging: 'charge'>, u'missionCoveredSquareFootage': 0, u'missionElapsedMinutes': 0, u'batteryPercentage': 100}
-
-.. code:: python
-
-    print json.dumps(robot.GetMission(), sort_keys=True, indent=4)
-
-    {
-        "batteryPercentage": 100, 
-        "binStatus": "Normal", 
-        "missionCoveredSquareFootage": 0, 
-        "missionElapsedMinutes": 0, 
-        "readyStatus": "Ready", 
-        "robotPosition": {
-            "point": {
-                "x": 2, 
-                "y": -22
-            }, 
-            "theta": -79
-        }, 
-        "robotStatus": "Charging"
     }
 
 Errors
