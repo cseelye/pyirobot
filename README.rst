@@ -35,8 +35,8 @@ You can start and stop cleaning and send the robot back to the home base with ``
     robot.StopCleaning()
     robot.ReturnHome()
 
-Robot Configuration
-'''''''''''''''''''
+Robot Configuration/Status
+''''''''''''''''''''''''''
 
 ``GetCleaningPreferences`` returns the cleaning preferences for the robot.  CarpetBoost, CleaningPasses, EdgeClean and
 FinishWhenBinFull are all enums in the module.
@@ -46,9 +46,12 @@ FinishWhenBinFull are all enums in the module.
     import json
     from pyirobot import Robot
     robot = Robot("192.168.0.0", "MtccDqXskShX|4jXnTd")
+    print robot.GetCleaningPreferences()
     print json.dumps(robot.GetCleaningPreferences(), sort_keys=True, indent=4)
 
 Output::
+
+    {u'lang': 0, u'cleaningPasses': <CleaningPasses.Two: 1025>, u'name': u'Roomba', u'finishWhenBinFull': <FinishWhenBinFull.Off: 32>, u'carpetBoost': <CarpetBoost.Auto: 0>, u'edgeClean': <EdgeClean.On: 0>, u'timezone': u'America/Chicago'}
 
     {
         "carpetBoost": "Auto", 
@@ -62,6 +65,73 @@ Output::
 
 There are other functions for getting the cleaning schedule, robot time, and various other settings, as well as the corresponding
 Set functions.
+
+.. code:: python
+
+    print robot.GetSchedule()
+
+    {'Sunday': {'startTime': datetime.time(9, 0), 'clean': False}, 'Monday': {'startTime': datetime.time(10, 0), 'clean': True}, 'Tuesday': {'startTime': datetime.time(10, 0), 'clean': True}, 'Wednesday': {'startTime': datetime.time(10, 0), 'clean': True}, 'Thursday': {'startTime': datetime.time(10, 0), 'clean': True}, 'Friday': {'startTime': datetime.time(10, 0), 'clean': True}, 'Saturday': {'startTime': datetime.time(10, 0), 'clean': False}}
+
+.. code:: python
+
+    print json.dumps(robot.GetSchedule(), indent=4)
+
+    {
+        "Sunday": {
+            "startTime": "09:00:00", 
+            "clean": false
+        }, 
+        "Monday": {
+            "startTime": "10:00:00", 
+            "clean": true
+        }, 
+        "Tuesday": {
+            "startTime": "10:00:00", 
+            "clean": true
+        }, 
+        "Wednesday": {
+            "startTime": "10:00:00", 
+            "clean": true
+        }, 
+        "Thursday": {
+            "startTime": "10:00:00", 
+            "clean": true
+        }, 
+        "Friday": {
+            "startTime": "10:00:00", 
+            "clean": true
+        }, 
+        "Saturday": {
+            "startTime": "10:00:00", 
+            "clean": false
+        }
+    }
+
+.. code:: python
+
+    print robot.GetMission()
+
+    {u'binStatus': <BinStatus.Normal: (0,)>, u'readyStatus': <ReadyStatus.Ready: 0>, u'robotPosition': {u'theta': -79, u'point': {u'y': -22, u'x': 2}}, u'robotStatus': <RobotStatus.Charging: 'charge'>, u'missionCoveredSquareFootage': 0, u'missionElapsedMinutes': 0, u'batteryPercentage': 100}
+
+.. code:: python
+
+    print json.dumps(robot.GetMission(), sort_keys=True, indent=4)
+
+    {
+        "batteryPercentage": 100, 
+        "binStatus": "Normal", 
+        "missionCoveredSquareFootage": 0, 
+        "missionElapsedMinutes": 0, 
+        "readyStatus": "Ready", 
+        "robotPosition": {
+            "point": {
+                "x": 2, 
+                "y": -22
+            }, 
+            "theta": -79
+        }, 
+        "robotStatus": "Charging"
+    }
 
 Errors
 ''''''
