@@ -50,11 +50,13 @@ class EdgeClean(Enum):
 
 class MissionState(Enum):
     Unknown = -1
-    Normal = 4
     BinFull = 1
+    BinMissing = 2
+    Normal = 4
     Resuming = 8
 
 class RobotStatus(Enum):
+    Unknown = "unknown"
     Idle = "none"
     Cleaning = "run"
     Stopped = "stop"
@@ -63,6 +65,21 @@ class RobotStatus(Enum):
     ReturningHome = "hmPostMsn"
     Cancelling = "hmUsrDock"
     Stuck = "stuck"
+
+class BinStatus(Enum):
+    Unknown = -1,
+    Normal = 0,
+    Full = 1,
+    Missing = 2
+
+class ReadyStatus(Enum):
+    Unknown = -1
+    Ready = 0
+    Cliff = 1
+    BothWheelsDropped = 2
+    LeftWheelDropped = 3
+    RightWheelDropped = 4
+    BinMissing = 7
 
 # From http://homesupport.irobot.com/app/answers/detail/a_id/9024/~/roomba-900-error-messages
 _ErrorMessages = {
@@ -321,33 +338,46 @@ class Robot(object):
 
         # Transform the data to be more user friendly and closer to how the app presents it
         res[u"batteryPercentage"] = res.pop("batPct")
+
         if res["expireM"] <= 0:
             res.pop("expireM")
         else:
             res[u"minutesUntilMissionCancelled"] = res.pop("expireM")
+
         res[u"missionElapsedMinutes"] = res.pop("mssnM")
-        res[u"readyToStart"] = True if res["notReady"] == 0 else False
-        res.pop("notReady")
+
+        try:
+            res[u"readyStatus"] = ReadyStatus(res["notReady"])
+        except ValueError:
+            res[u"readyStatus"] = ReadyStatus.Unknown
+        if res["readyStatus"] != ReadyStatus.Unknown:
+            res.pop("notReady")
+
         res[u"robotPosition"] = res.pop("pos")
+
         if res["rechrgM"] <= 0:
             res.pop("rechrgM")
         else:
             res[u"rechargeMinutesRemaining"] = res.pop("rechrgM")
+
         res[u"missionCoveredSquareFootage"] = res.pop("sqft")
 
-        res[u"binFull"] = False
+        res[u"binStatus"] = BinStatus.Normal
         if res["flags"] & MissionState.BinFull.value == MissionState.BinFull.value:
-            res[u"binFull"] = True
+            res[u"binStatus"] = BinStatus.Full
+        elif res["flags"] & MissionState.BinMissing.value == MissionState.BinMissing.value:
+            res[u"binStatus"] = BinStatus.Missing
 
         try:
             res[u"robotStatus"] = RobotStatus(res["phase"])
         except ValueError:
-            res[u"robotStatus"] = res["phase"]
-        if res["robotStatus"] == RobotStatus.Cleaning and res["flags"] * MissionState.Resuming.value == MissionState.Resuming.value:
+            res[u"robotStatus"] = RobotStatus.Unknown
+        if res["robotStatus"] == RobotStatus.Cleaning and res["flags"] & MissionState.Resuming.value == MissionState.Resuming.value:
             res[u"robotStatus"] = RobotStatus.Resuming
 
-        res.pop("flags")
-        res.pop("phase")
+        if res["robotStatus"] != RobotStatus.Unknown:
+            res.pop("flags")
+            res.pop("phase")
 
         if res["error"] == 0:
             res.pop("error")
