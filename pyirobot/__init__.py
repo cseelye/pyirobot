@@ -480,7 +480,7 @@ class Robot(object):
         them.
         
         The easiest way to use this function is to call GetCleaningPreferences,
-        modify the result, and use that as the inut to this function.
+        modify the result, and use that as the input to this function.
 
         Args:
             prefs:  a dictionary of preferences
@@ -583,3 +583,33 @@ class Robot(object):
         """
         self.SetTime(datetime.datetime.now())
 
+    def SetSchedule(self, newSchedule):
+        """
+        Set the cleaning schedule for this robot.
+        The easiest way to use this function is to call GetSchedule, modify
+        the result, and use that as the input to this function
+
+        Args:
+            schedule:   the schedule to set (dict)
+        """
+        # Sort calendar day names into the order the robot expects
+        days = {}
+        for cal_idx, dayname in enumerate(calendar.day_name):
+            idx = cal_idx + 1 if cal_idx < 6 else 0
+            days[idx] = dayname
+
+        sched = collections.OrderedDict([
+            ("cycle", []),
+            ("h", []),
+            ("m", [])
+        ])
+        for idx in sorted(days):
+            dayname = days[idx]
+            if newSchedule[dayname]["clean"]:
+                sched["cycle"].append("start")
+            else:
+                sched["cycle"].append("none")
+            sched["h"].append(newSchedule[dayname]["startTime"].hour)
+            sched["m"].append(newSchedule[dayname]["startTime"].minute)
+
+        self._PostToRobot("set", ["week", sched])
