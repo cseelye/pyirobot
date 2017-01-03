@@ -4,6 +4,7 @@ A python library for controlling an iRobot cleaning robot
 Only the Roomba 980 is tested; the Roomba 960 should work and possibly the Braava Jet
 """
 
+import calendar
 import collections
 import datetime
 from enum import Enum
@@ -32,21 +33,37 @@ class CarpetBoost(Enum):
     Eco = 16
     Perf = 80
 
+    @classmethod
+    def PrefName(cls):
+        return "carpetBoost"
+
 class CleaningPasses(Enum):
     Unknown = -1
     Auto = 0
     One = 1024
     Two = 1025
 
+    @classmethod
+    def PrefName(cls):
+        return "cleaningPasses"
+
 class FinishWhenBinFull(Enum):
     Unknown = -1
     On = 0
     Off = 32
 
+    @classmethod
+    def PrefName(cls):
+        return "finishWhenBinFull"
+
 class EdgeClean(Enum):
     Unknown = -1
     On = 0
     Off = 2
+
+    @classmethod
+    def PrefName(cls):
+        return "edgeClean"
 
 class MissionState(Enum):
     Unknown = -1
@@ -102,37 +119,6 @@ _MissionCycleToCleaningPasses = {
     "quick" : CleaningPasses.One,
     "clean" : CleaningPasses.Two
 }
-
-class Weekdays(Enum):
-    Sunday = 0
-    Monday = 1
-    Tuesday = 2
-    Wednesday = 3
-    Thursday = 4
-    Friday = 5
-    Saturday = 6
-
-_DayToWeekday = {
-    "sun" : Weekdays["Sunday"],
-    "mon" : Weekdays["Monday"],
-    "tue" : Weekdays["Tuesday"],
-    "wed" : Weekdays["Wednesday"],
-    "thu" : Weekdays["Thursday"],
-    "fri" : Weekdays["Friday"],
-    "sat" : Weekdays["Saturday"]
-}
-
-def _EnumToCamelCase(obj):
-    """
-    Convert an Enum class to a camelCase name
-
-    Args:
-        obj:    the Enum to get a name for (Enum)
-
-    Returns:
-        A camelCase version of the Enum name (str)
-    """
-    return obj.__name__[0].lower() + obj.__name__[1:]
 
 class RobotError(Exception):
     """ Exception thrown when there is an error """
@@ -219,10 +205,12 @@ class Robot(object):
         """
         if isinstance(args, basestring) or not isinstance(args, collections.Iterable):
             args = [args]
+        post_data = json.dumps({"do" : cmd,
+                                "args" : args,
+                                "id" : self._GetRequestID()})
+#        print post_data
         result = requests.post("https://{}/umi".format(self.ip),
-                                data=json.dumps({"do" : cmd,
-                                                 "args" : args,
-                                                 "id" : self._GetRequestID()}),
+                                data=post_data,
                                 auth=("user", self.password),
                                 headers={"Content-Type" : "application/json"},
                                 verify=False)
@@ -232,6 +220,45 @@ class Robot(object):
         if "err" in res:
             raise RobotError(res["err"])
         return res["ok"]
+
+    def _DecodePreferencesFlags(self, flags):
+        """
+        Decode the 'flags' field from a preferences call into individual
+        preferences enums.
+
+        Args:
+            flags:  the integer flags value (int)
+
+        Returns:
+            A dictionary of preferences (dict)
+        """
+        prefs = {}
+        for conf in (CarpetBoost, CleaningPasses, FinishWhenBinFull, EdgeClean):
+            pref_name = unicode(conf.PrefName())
+            test = flags & max(conf, key=lambda x: x.value).value
+            try:
+                prefs[pref_name] = conf(test)
+            except ValueError:
+                prefs[pref_name] = conf["Unknown"]
+        return prefs
+
+    def _EncodePreferencesFlags(self, prefs):
+        """
+        Encode a dictionary of preferences into a single 'flags' integer
+
+        Args:
+            prefs: a dictionary of preferences (dict)
+
+        Returns:
+            An integer representing the value of the preferences (int)
+        """
+        flags = 0
+        for conf in (CarpetBoost, CleaningPasses, FinishWhenBinFull, EdgeClean):
+            pref_name = conf.PrefName()
+            assert pref_name in prefs, "{} must be in prefs".format(pref_name)
+            assert isinstance(prefs[pref_name], conf), "{} must be a {} enum".format(pref_name, conf.__name__)
+            flags += prefs[pref_name].value
+        return flags
 
     def StartCleaning(self):
         """
@@ -286,16 +313,7 @@ class Robot(object):
             prefs[key] = value
 
         # Decode the flags
-        flags = result["flags"]
-        for conf in (CarpetBoost, CleaningPasses, FinishWhenBinFull, EdgeClean):
-            pref_name = unicode(_EnumToCamelCase(conf))
-            test = flags & max(conf, key=lambda x: x.value).value
-            try:
-                item = conf(test)
-            except ValueError:
-                prefs[pref_name] = conf["Unknown"]
-                continue
-            prefs[pref_name] = item
+        prefs.update(self._DecodePreferencesFlags(result["flags"]))
         return prefs
 
     def GetTime(self):
@@ -306,9 +324,10 @@ class Robot(object):
             A dictionary with the time of day and day of week (dict)
         """
         result = self._PostToRobot("get", "time")
+        day_idx = [idx for idx, day in enumerate(calendar.day_abbr) if day.lower() == result["d"]][0]
         return {
             "time" : datetime.time(result["h"], result["m"]),
-            "weekday" : _DayToWeekday[result["d"]]
+            "weekday" : calendar.day_name[day_idx]
         }
 
     def GetSchedule(self):
@@ -321,7 +340,10 @@ class Robot(object):
         res = self._PostToRobot("get", "week")
         schedule = {}
         for idx in xrange(7):
-            schedule[Weekdays(idx).name] = {
+            cal_day_idx = idx - 1
+            if cal_day_idx < 0:
+                cal_day_idx = 6
+            schedule[calendar.day_name[cal_day_idx]] = {
                 "clean" : True if res["cycle"][idx] == "start" else False,
                 "startTime" : datetime.time(res["h"][idx], res["m"][idx])
             }
@@ -450,3 +472,114 @@ class Robot(object):
             "cleaningPreferences" : self.GetCleaningPreferences(),
             "mission" : self.GetMission()
         }
+
+    def SetCleaningPreferences(self, prefs):
+        """
+        Set the cleaning preferences for this robot. All of the fields are
+        required in the preferences dictionary, even if you are not changing
+        them.
+        
+        The easiest way to use this function is to call GetCleaningPreferences,
+        modify the result, and use that as the inut to this function.
+
+        Args:
+            prefs:  a dictionary of preferences
+        """
+        newprefs = collections.OrderedDict([
+            ("flags", self._EncodePreferencesFlags(prefs)),
+            ("lang", prefs["lang"]),
+            ("timezone", prefs["timezone"]),
+            ("name", prefs["name"])
+        ])
+        self._PostToRobot("set", ["prefs", newprefs])
+
+    def SetCarpetBoost(self, newValue):
+        """
+        Set the Carpet Boost cleaning preference
+
+        Args:
+            newValue:  the value to set (CarpetBoost)
+        """
+        assert isinstance(newValue, CarpetBoost), "newValue must be a CarpetBoost enum value"
+        prefs = self.GetCleaningPreferences()
+        prefs[CarpetBoost.PrefName()] = newValue
+        self.SetCleaningPreferences(prefs)
+
+    def SetCleaningPasses(self, newValue):
+        """
+        Set the Cleaning Passes cleaning preference
+
+        Args:
+            newValue:  the value to set (CleaningPasses)
+        """
+        assert isinstance(newValue, CleaningPasses), "newValue must be a CleaningPasses enum value"
+        prefs = self.GetCleaningPreferences()
+        prefs[CleaningPasses.PrefName()] = newValue
+        self.SetCleaningPreferences(prefs)
+
+    def SetFinishWhenBinFull(self, newValue):
+        """
+        Set the Finish When Bin Full cleaning preference
+
+        Args:
+            newValue:  the value to set (FinishWhenBinFull)
+        """
+        assert isinstance(newValue, FinishWhenBinFull), "newValue must be a FinishWhenBinFull enum value"
+        prefs = self.GetCleaningPreferences()
+        prefs[FinishWhenBinFull.PrefName()] = newValue
+        self.SetCleaningPreferences(prefs)
+
+    def SetEdgeClean(self, newValue):
+        """
+        Set the Edge Clean cleaning preference
+
+        Args:
+            newValue:  the value to set (EdgeClean)
+        """
+        assert isinstance(newValue, EdgeClean), "newValue must be an EdgeClean enum value"
+        prefs = self.GetCleaningPreferences()
+        prefs[EdgeClean.PrefName()] = newValue
+        self.SetCleaningPreferences(prefs)
+
+    def SetTimezone(self, newValue):
+        """
+        Set the robot's timezone. The time zone must be a tz database name.
+        https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+
+        For instance, common US time zones:
+            Pacific time:  'America/Los_Angeles' or 'US/Pacific'
+            Mountain time: 'America/Denver' or 'US/Mountain'
+            Central time:  'America/Chicago' or 'US/Central'
+            Eastern time:  'America/New_York' or 'US/Eastern'
+
+        Args:
+            newValue:   the time zone name (str)
+        """
+        prefs = self.GetCleaningPreferences()
+        prefs[u"timezone"] = newValue
+        self.SetCleaningPreferences(prefs)
+
+    def SetTime(self, newTime):
+        """
+        Set the robot's time. The robot only cares about weekday, hour and
+        minute, so those are the only fields that need to be accurate in
+        the datetime object.
+
+        Args:
+            newTime:    the time to set the robot to (datetime)
+        """
+        weekday = newTime.isoweekday()
+        if weekday > 6:
+            weekday = 0
+        self._PostToRobot("set", ["time", collections.OrderedDict([
+            ("d", weekday),
+            ("h", newTime.hour),
+            ("m", newTime.minute)])
+        ])
+
+    def SetTimeNow(self):
+        """
+        Set the robot's time to the current time
+        """
+        self.SetTime(datetime.datetime.now())
+
