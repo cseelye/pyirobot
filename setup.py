@@ -5,7 +5,7 @@ import os
 
 setup(
     name = "pyirobot",
-    version = "1.0.3",
+    version = "1.0.4",
     author = "Carl Seelye",
     author_email = "cseelye@gmail.com",
     description = "Control iRobot cleaning robots",

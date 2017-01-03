@@ -97,6 +97,8 @@ class ReadyStatus(Enum):
     LeftWheelDropped = 3
     RightWheelDropped = 4
     BinMissing = 7
+    Charging = 15
+    BinFull = 16
 
 # From http://homesupport.irobot.com/app/answers/detail/a_id/9024/~/roomba-900-error-messages
 _ErrorMessages = {
