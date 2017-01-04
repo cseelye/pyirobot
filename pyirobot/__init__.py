@@ -387,10 +387,10 @@ class Robot(object):
         res[u"missionCoveredSquareFootage"] = res.pop("sqft")
 
         res[u"binStatus"] = BinStatus.Normal
-        if res["flags"] & MissionState.BinFull.value == MissionState.BinFull.value:
-            res[u"binStatus"] = BinStatus.Full
-        elif res["flags"] & MissionState.BinMissing.value == MissionState.BinMissing.value:
+        if res["flags"] & MissionState.BinMissing.value == MissionState.BinMissing.value:
             res[u"binStatus"] = BinStatus.Missing
+        elif res["flags"] & MissionState.BinFull.value == MissionState.BinFull.value:
+            res[u"binStatus"] = BinStatus.Full
 
         try:
             res[u"robotStatus"] = RobotStatus(res["phase"])
