@@ -11,4 +11,4 @@ def RandomIP():
                                 random.randint(1,254))
 
 def RandomComplexString(length):
-    return "".join(random.choice(string.ascii_letters + string.digits + string.punctuation + " ") for i in xrange(length))
+    return "".join(random.choice(string.ascii_letters + string.digits + string.punctuation + " ") for i in range(length))

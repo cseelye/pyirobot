@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #pylint: skip-file
 
+from __future__ import print_function
 import itertools
 import pytest
 import types
@@ -9,7 +10,7 @@ from .util import RandomComplexString, RandomIP
 class Test_PreferenceFlags(object):
 
     def test_DecodeFlags(self):
-        print
+        print()
 
         from pyirobot import CarpetBoost, CleaningPasses, FinishWhenBinFull, EdgeClean, Robot
         robot = Robot(RandomIP(), RandomComplexString(64))
@@ -25,12 +26,14 @@ class Test_PreferenceFlags(object):
         setattr(robot, "_PostToRobot", types.MethodType(fake_post, robot))
 
         # Test decoding every combination of options
-        combinations = list(itertools.product(list(CarpetBoost), list(CleaningPasses), list(FinishWhenBinFull), list(EdgeClean)))
+        combinations = list(itertools.product(list(CarpetBoost)[1:], list(CleaningPasses)[1:], list(FinishWhenBinFull)[1:], list(EdgeClean)[1:]))
         for combo in combinations:
             setattr(robot, "_fake_preferences", combo)
-            prefs = robot.GetPreferences()
-            assert CarpetBoost[prefs["carpetBoost"]] == combo[0]
-            assert CleaningPasses[prefs["cleaningPasses"]] == combo[1]
-            assert FinishWhenBinFull[prefs["finishWhenBinFull"]] == combo[2]
-            assert EdgeClean[prefs["edgeClean"]] == combo[3]
+            print("combo={}".format(combo))
+            prefs = robot.GetCleaningPreferences()
+            print("prefs={}".format(prefs))
+            assert prefs["carpetBoost"] == combo[0]
+            assert prefs["cleaningPasses"] == combo[1]
+            assert prefs["finishWhenBinFull"] == combo[2]
+            assert prefs["edgeClean"] == combo[3]
 

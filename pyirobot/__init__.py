@@ -1,9 +1,10 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python
 """
 A python library for controlling an iRobot cleaning robot
 Only the Roomba 980 is tested; the Roomba 960 should work and possibly the Braava Jet
 """
 
+from __future__ import print_function
 import calendar
 import collections
 import datetime
@@ -38,7 +39,7 @@ class CarpetBoost(Enum):
         return "carpetBoost"
 
 class CleaningPasses(Enum):
-    Unknown = -1
+    Unknown = -2
     Auto = 0
     One = 1024
     Two = 1025
@@ -48,7 +49,7 @@ class CleaningPasses(Enum):
         return "cleaningPasses"
 
 class FinishWhenBinFull(Enum):
-    Unknown = -1
+    Unknown = -4
     On = 0
     Off = 32
 
@@ -57,7 +58,7 @@ class FinishWhenBinFull(Enum):
         return "finishWhenBinFull"
 
 class EdgeClean(Enum):
-    Unknown = -1
+    Unknown = -8
     On = 0
     Off = 2
 
@@ -205,19 +206,19 @@ class Robot(object):
         Returns:
             The JSON response parsed into a dictionary (dict)
         """
-        if isinstance(args, basestring) or not isinstance(args, collections.Iterable):
+        if isinstance(args, str) or not isinstance(args, collections.Iterable):
             args = [args]
         post_data = json.dumps({"do" : cmd,
                                 "args" : args,
                                 "id" : self._GetRequestID()})
-#        print post_data
+#        print(post_data)
         result = requests.post("https://{}/umi".format(self.ip),
                                 data=post_data,
                                 auth=("user", self.password),
                                 headers={"Content-Type" : "application/json"},
                                 verify=False)
-#        print result.request.body
-#        print result.text
+#        print(result.request.body)
+#        print(result.text)
         res = result.json()
         if "err" in res:
             raise RobotError(res["err"])
@@ -236,7 +237,7 @@ class Robot(object):
         """
         prefs = {}
         for conf in (CarpetBoost, CleaningPasses, FinishWhenBinFull, EdgeClean):
-            pref_name = unicode(conf.PrefName())
+            pref_name = conf.PrefName()
             test = flags & max(conf, key=lambda x: x.value).value
             try:
                 prefs[pref_name] = conf(test)
@@ -309,7 +310,7 @@ class Robot(object):
         """
         result = self._PostToRobot("get", "prefs")
         prefs = {}
-        for key, value in result.iteritems():
+        for key, value in list(result.items()):
             if key == "flags":
                 continue
             prefs[key] = value
@@ -341,7 +342,7 @@ class Robot(object):
         """
         res = self._PostToRobot("get", "week")
         schedule = {}
-        for idx in xrange(7):
+        for idx in range(7):
             cal_day_idx = idx - 1
             if cal_day_idx < 0:
                 cal_day_idx = 6
@@ -361,43 +362,43 @@ class Robot(object):
         res = self._PostToRobot("get", "mssn")
 
         # Transform the data to be more user friendly and closer to how the app presents it
-        res[u"batteryPercentage"] = res.pop("batPct")
+        res["batteryPercentage"] = res.pop("batPct")
 
         if res["expireM"] <= 0:
             res.pop("expireM")
         else:
-            res[u"minutesUntilMissionCancelled"] = res.pop("expireM")
+            res["minutesUntilMissionCancelled"] = res.pop("expireM")
 
-        res[u"missionElapsedMinutes"] = res.pop("mssnM")
+        res["missionElapsedMinutes"] = res.pop("mssnM")
 
         try:
-            res[u"readyStatus"] = ReadyStatus(res["notReady"])
+            res["readyStatus"] = ReadyStatus(res["notReady"])
         except ValueError:
-            res[u"readyStatus"] = ReadyStatus.Unknown
+            res["readyStatus"] = ReadyStatus.Unknown
         if res["readyStatus"] != ReadyStatus.Unknown:
             res.pop("notReady")
 
-        res[u"robotPosition"] = res.pop("pos")
+        res["robotPosition"] = res.pop("pos")
 
         if res["rechrgM"] <= 0:
             res.pop("rechrgM")
         else:
-            res[u"rechargeMinutesRemaining"] = res.pop("rechrgM")
+            res["rechargeMinutesRemaining"] = res.pop("rechrgM")
 
-        res[u"missionCoveredSquareFootage"] = res.pop("sqft")
+        res["missionCoveredSquareFootage"] = res.pop("sqft")
 
-        res[u"binStatus"] = BinStatus.Normal
+        res["binStatus"] = BinStatus.Normal
         if res["flags"] & MissionState.BinMissing.value == MissionState.BinMissing.value:
-            res[u"binStatus"] = BinStatus.Missing
+            res["binStatus"] = BinStatus.Missing
         elif res["flags"] & MissionState.BinFull.value == MissionState.BinFull.value:
-            res[u"binStatus"] = BinStatus.Full
+            res["binStatus"] = BinStatus.Full
 
         try:
-            res[u"robotStatus"] = RobotStatus(res["phase"])
+            res["robotStatus"] = RobotStatus(res["phase"])
         except ValueError:
-            res[u"robotStatus"] = RobotStatus.Unknown
+            res["robotStatus"] = RobotStatus.Unknown
         if res["robotStatus"] == RobotStatus.Cleaning and res["flags"] & MissionState.Resuming.value == MissionState.Resuming.value:
-            res[u"robotStatus"] = RobotStatus.Resuming
+            res["robotStatus"] = RobotStatus.Resuming
 
         if res["robotStatus"] != RobotStatus.Unknown:
             res.pop("flags")
@@ -406,7 +407,7 @@ class Robot(object):
         if res["error"] == 0:
             res.pop("error")
         elif res["error"] in _ErrorMessages:
-            res[u"errorMessage"] = _ErrorMessages[res["error"]]
+            res["errorMessage"] = _ErrorMessages[res["error"]]
 
         if res["cycle"] == "none":
             res.pop("cycle")
@@ -558,7 +559,7 @@ class Robot(object):
             newValue:   the time zone name (str)
         """
         prefs = self.GetCleaningPreferences()
-        prefs[u"timezone"] = newValue
+        prefs["timezone"] = newValue
         self.SetCleaningPreferences(prefs)
 
     def SetTime(self, newTime):
